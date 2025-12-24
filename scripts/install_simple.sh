@@ -1,6 +1,12 @@
-#!/binecho "=========================================
-E-Ink Pet Clock - Simple Install
-========================================="
+#!/bin/bash
+# Simple installation - assumes hardware dependencies already work
+# Use this if you can already run hardware/example.py
+
+set -e
+
+echo "========================================="
+echo "E-Ink Pet Clock - Simple Install"
+echo "========================================="
 echo "This assumes your display hardware already works!"
 echo ""
 
