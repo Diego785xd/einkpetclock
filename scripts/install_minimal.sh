@@ -1,22 +1,12 @@
 #!/bin/bash
-# Installation script for E-Ink Pet Clock on Raspberry Pi
-# Run this on the Pi after first deployment
+# Minimal installation - uses system packages when possible
+# Better for newer Raspberry Pi OS with PEP 668
 
 set -e
 
 echo "========================================="
-echo "E-Ink Pet Clock Installation"
+echo "E-Ink Pet Clock - Minimal Install"
 echo "========================================="
-
-# Check if running on Pi
-if [ ! -f /proc/device-tree/model ] || ! grep -q "Raspberry Pi" /proc/device-tree/model; then
-    echo "Warning: This doesn't appear to be a Raspberry Pi"
-    read -p "Continue anyway? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
-fi
 
 PROJECT_DIR="/home/pi/einkpetclock"
 VENV_DIR="$PROJECT_DIR/venv"
@@ -28,9 +18,9 @@ echo ""
 echo "Updating system packages..."
 sudo apt-get update
 
-# Install system dependencies
+# Install ALL dependencies via apt (preferred method)
 echo ""
-echo "Installing system dependencies..."
+echo "Installing system packages..."
 sudo apt-get install -y \
     python3 \
     python3-pip \
@@ -38,40 +28,23 @@ sudo apt-get install -y \
     python3-dev \
     python3-pil \
     python3-rpi.gpio \
+    python3-dotenv \
+    python3-tz \
     git \
     build-essential
 
-# Try to install system packages for dependencies (preferred)
-echo ""
-echo "Installing Python system packages..."
-sudo apt-get install -y \
-    python3-dotenv \
-    python3-tz \
-    python3-pil \
-    2>/dev/null || echo "Some packages not available via apt, will use pip"
-
-# Install Waveshare e-Paper library (try system package first, then pip)
+# Install Waveshare library using --break-system-packages (safe for system-wide libraries)
 echo ""
 echo "Installing Waveshare e-Paper library..."
-if ! sudo apt-get install -y python3-waveshare-epd 2>/dev/null; then
-    echo "Not available via apt, installing via pip with --break-system-packages..."
-    sudo pip3 install --break-system-packages waveshare-epd
-fi
+sudo pip3 install --break-system-packages waveshare-epd
 
-# Install base Python dependencies in user space
-echo ""
-echo "Installing Python dependencies (user space)..."
-cd "$PROJECT_DIR"
-pip3 install --user --break-system-packages -r requirements.txt 2>/dev/null || \
-    pip3 install --user -r requirements.txt
-
-# Create and setup venv for API
+# Create virtual environment for API only
 echo ""
 echo "Creating virtual environment for API..."
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip
-pip install -r web/requirements.txt
+pip install -r "$PROJECT_DIR/web/requirements.txt"
 deactivate
 
 # Create .env if it doesn't exist
@@ -79,9 +52,11 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
     echo ""
     echo "Creating .env file..."
     cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-    echo "Please edit .env file with your configuration:"
-    echo "  nano $PROJECT_DIR/.env"
-    read -p "Press Enter to continue after editing..."
+    echo ""
+    echo "⚠️  IMPORTANT: Edit .env file with your configuration:"
+    echo "    nano $PROJECT_DIR/.env"
+    echo ""
+    read -p "Press Enter after editing .env file..."
 fi
 
 # Create necessary directories
@@ -91,6 +66,9 @@ mkdir -p "$PROJECT_DIR/data"
 mkdir -p "$PROJECT_DIR/assets/sprites"
 mkdir -p "$PROJECT_DIR/assets/fonts"
 mkdir -p /tmp/eink_flags
+
+# Make scripts executable
+chmod +x "$PROJECT_DIR/scripts/"*.sh
 
 # Set permissions
 chmod -R 755 "$PROJECT_DIR"
@@ -110,7 +88,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo systemctl enable eink-display.service
     sudo systemctl enable eink-api.service
-    echo "Services enabled"
+    echo "✓ Services enabled"
 fi
 
 # Start services
@@ -120,21 +98,28 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo systemctl start eink-display.service
     sudo systemctl start eink-api.service
-    echo "Services started"
+    echo "✓ Services started"
     
     # Show status
     sleep 2
     echo ""
     echo "Service status:"
-    sudo systemctl status eink-display.service --no-pager -l
+    echo "--- Display Service ---"
+    sudo systemctl status eink-display.service --no-pager -l | head -n 10
     echo ""
-    sudo systemctl status eink-api.service --no-pager -l
+    echo "--- API Service ---"
+    sudo systemctl status eink-api.service --no-pager -l | head -n 10
 fi
 
 echo ""
 echo "========================================="
 echo "Installation complete!"
 echo "========================================="
+echo ""
+echo "✓ System packages installed"
+echo "✓ Waveshare library installed"
+echo "✓ Virtual environment created for API"
+echo "✓ Systemd services configured"
 echo ""
 echo "Useful commands:"
 echo "  View display logs:  sudo journalctl -u eink-display.service -f"
@@ -143,5 +128,6 @@ echo "  Restart display:    sudo systemctl restart eink-display.service"
 echo "  Restart API:        sudo systemctl restart eink-api.service"
 echo "  Stop all:           sudo systemctl stop eink-display.service eink-api.service"
 echo ""
-echo "Edit configuration:   nano $PROJECT_DIR/.env"
+echo "Configuration:"
+echo "  Edit settings:      nano $PROJECT_DIR/.env"
 echo ""

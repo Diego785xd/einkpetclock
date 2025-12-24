@@ -95,9 +95,15 @@ bash scripts/deploy.sh 10.8.17.62
 # SSH to Pi
 ssh pi@10.8.17.62
 
-# Run installation
+# Run installation (choose based on your Python version)
 cd ~/einkpetclock
-bash scripts/install.sh
+
+# For Python 3.11+ (recommended for newer Pi OS)
+bash scripts/install_minimal.sh
+
+# OR for older systems:
+# bash scripts/install.sh
+
 # Follow the prompts!
 ```
 
