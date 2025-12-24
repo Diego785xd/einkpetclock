@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/einkpetclock
+User=%u
+Group=%u
+WorkingDirectory=%h/einkpetclock
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/usr/bin/python3 /home/pi/einkpetclock/core/display_manager.py
+ExecStart=/usr/bin/python3 %h/einkpetclock/core/display_manager.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -1,5 +1,28 @@
-#!/bin/bash
-# Simple installation - assumes hardware dependencies already work
+#!/binecho "=========================================
+E-Ink Pet Clock - Simple Install
+========================================="
+echo "This assumes your display hardware already works!"
+echo ""
+
+# Detect current directory or use home directory
+if [ -f "$(pwd)/core/config.py" ]; then
+    PROJECT_DIR="$(pwd)"
+else
+    PROJECT_DIR="$HOME/einkpetclock"
+fi
+
+VENV_DIR="$PROJECT_DIR/venv"
+
+echo "Project directory: $PROJECT_DIR"
+
+# Verify we're in the right place
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo "Error: Project directory not found at $PROJECT_DIR"
+    echo "Please cd to the project directory and run this script again"
+    exit 1
+fi
+
+cd "$PROJECT_DIR"nstallation - assumes hardware dependencies already work
 # Use this if you can already run hardware/example.py
 
 set -e
@@ -118,8 +141,14 @@ chmod 644 "$PROJECT_DIR/.env" 2>/dev/null || true
 # Install systemd services
 echo ""
 echo "Installing systemd services..."
-sudo cp "$PROJECT_DIR/systemd/eink-display.service" /etc/systemd/system/
-sudo cp "$PROJECT_DIR/systemd/eink-api.service" /etc/systemd/system/
+
+# Replace %u and %h with actual user and home directory
+sed "s|%u|$USER|g; s|%h|$HOME|g" "$PROJECT_DIR/systemd/eink-display.service" | \
+    sudo tee /etc/systemd/system/eink-display.service > /dev/null
+
+sed "s|%u|$USER|g; s|%h|$HOME|g" "$PROJECT_DIR/systemd/eink-api.service" | \
+    sudo tee /etc/systemd/system/eink-api.service > /dev/null
+
 sudo systemctl daemon-reload
 echo "✓ Services installed"
 

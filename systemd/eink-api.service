@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/einkpetclock/web
+User=%u
+Group=%u
+WorkingDirectory=%h/einkpetclock/web
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/home/pi/einkpetclock/venv/bin/python /home/pi/einkpetclock/web/api.py
+ExecStart=%h/einkpetclock/venv/bin/python %h/einkpetclock/web/api.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

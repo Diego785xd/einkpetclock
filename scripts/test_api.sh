@@ -12,12 +12,12 @@ echo ""
 
 # Test 1: Health check
 echo "1. Health check..."
-curl -s "$BASE_URL/api/health" | python3 -m json.tool
+curl -s "$BASE_URL/api/health" | python3 -m json.tool 2>/dev/null || curl -s "$BASE_URL/api/health"
 echo ""
 
 # Test 2: Get status
 echo "2. Get status..."
-curl -s "$BASE_URL/api/status" | python3 -m json.tool
+curl -s "$BASE_URL/api/status" | python3 -m json.tool 2>/dev/null || curl -s "$BASE_URL/api/status"
 echo ""
 
 # Test 3: Send message
@@ -28,7 +28,9 @@ curl -s -X POST "$BASE_URL/api/message" \
         "from_device": "mac_test",
         "message": "Hello from Mac! 👋",
         "type": "text"
-    }' | python3 -m json.tool
+    }' | python3 -m json.tool 2>/dev/null || curl -s -X POST "$BASE_URL/api/message" \
+    -H "Content-Type: application/json" \
+    -d '{"from_device":"mac_test","message":"Hello from Mac!","type":"text"}'
 echo ""
 
 # Test 4: Send poke
@@ -37,7 +39,9 @@ curl -s -X POST "$BASE_URL/api/poke" \
     -H "Content-Type: application/json" \
     -d '{
         "from_device": "mac_test"
-    }' | python3 -m json.tool
+    }' | python3 -m json.tool 2>/dev/null || curl -s -X POST "$BASE_URL/api/poke" \
+    -H "Content-Type: application/json" \
+    -d '{"from_device":"mac_test"}'
 echo ""
 
 # Test 5: Send feed
@@ -46,7 +50,9 @@ curl -s -X POST "$BASE_URL/api/feed" \
     -H "Content-Type: application/json" \
     -d '{
         "from_device": "mac_test"
-    }' | python3 -m json.tool
+    }' | python3 -m json.tool 2>/dev/null || curl -s -X POST "$BASE_URL/api/feed" \
+    -H "Content-Type: application/json" \
+    -d '{"from_device":"mac_test"}'
 echo ""
 
 echo "Tests complete!"

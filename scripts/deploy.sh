@@ -1,20 +1,20 @@
 #!/bin/bash
 # Deployment script - run from your Mac to deploy to Pi
-# Usage: ./deploy.sh [pi_ip_address]
+# Usage: ./deploy.sh [pi_ip_address] [pi_username]
 
 set -e
 
 # Configuration
-PI_USER="pi"
 PI_IP="${1:-10.8.17.62}"  # Default to the IP from .env.example
-PI_DIR="/home/pi/einkpetclock"
+PI_USER="${2:-$USER}"     # Default to current username, or specify (e.g., pi, dai)
+PI_DIR="\$HOME/einkpetclock"  # Use remote user's home directory
 LOCAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "========================================="
 echo "E-Ink Pet Clock Deployment"
 echo "========================================="
 echo "Local:  $LOCAL_DIR"
-echo "Remote: $PI_USER@$PI_IP:$PI_DIR"
+echo "Remote: $PI_USER@$PI_IP:\$HOME/einkpetclock"
 echo ""
 
 # Check if Pi is reachable
@@ -41,7 +41,7 @@ fi
 # Create directory on Pi if it doesn't exist
 echo ""
 echo "Ensuring project directory exists on Pi..."
-ssh "$PI_USER@$PI_IP" "mkdir -p $PI_DIR"
+ssh "$PI_USER@$PI_IP" "mkdir -p \$HOME/einkpetclock"
 
 # Rsync files (excludes .git, __pycache__, data, venv, etc.)
 echo ""
@@ -56,7 +56,7 @@ rsync -avz --progress \
     --exclude='.env' \
     --exclude='.DS_Store' \
     --exclude='*.tmp' \
-    "$LOCAL_DIR/" "$PI_USER@$PI_IP:$PI_DIR/"
+    "$LOCAL_DIR/" "$PI_USER@$PI_IP:\$HOME/einkpetclock/"
 
 echo ""
 echo "✓ Files synced successfully"
