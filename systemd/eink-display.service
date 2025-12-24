@@ -1,0 +1,23 @@
+[Unit]
+Description=E-Ink Pet Clock Display Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/einkpetclock
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/usr/bin/python3 /home/pi/einkpetclock/core/display_manager.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+Nice=-5
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target

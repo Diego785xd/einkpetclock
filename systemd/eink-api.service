@@ -1,0 +1,22 @@
+[Unit]
+Description=E-Ink Pet Clock API Service
+After=network.target eink-display.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/einkpetclock/web
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/pi/einkpetclock/venv/bin/python /home/pi/einkpetclock/web/api.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

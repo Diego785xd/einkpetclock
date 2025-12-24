@@ -1,0 +1,8 @@
+# Core dependencies (for bare metal display service)
+python-dotenv==1.0.0
+Pillow==10.1.0
+# RPi.GPIO will be installed on Pi only
+
+# For e-ink display (Waveshare library)
+# Note: Install waveshare-epd library on Pi:
+# pip3 install waveshare-epd
