@@ -51,6 +51,7 @@ class Config:
     BUTTON_ACTION: int = 13  # Pin 33
     BUTTON_GO: int = 19      # Pin 35
     BUTTON_DEBOUNCE_MS: int = 200
+    BUTTON_LONG_PRESS_MS: int = 2000  # 2 seconds for long press
     
     # Update Intervals (seconds)
     CLOCK_UPDATE_INTERVAL: int = 60  # Update time every minute
