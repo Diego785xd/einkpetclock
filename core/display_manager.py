@@ -52,6 +52,7 @@ class DisplayManager:
         # Register button callbacks (using gpiozero API)
         self.buttons.on_return_press(self._on_return_button)
         self.buttons.on_action_press(self._on_action_button)
+        self.buttons.on_action_hold(self._on_action_long_press)  # Long press for special actions
         self.buttons.on_go_press(self._on_go_button)
         
         # Initial render
@@ -72,6 +73,14 @@ class DisplayManager:
     def _on_action_button(self):
         """Handle ACTION button press"""
         self.stats.increment("total_button_presses")
+        self.menu_system.handle_action()
+    
+    def _on_action_long_press(self):
+        """Handle ACTION button long press (hold)"""
+        if Config.DEBUG_MODE:
+            print("ACTION long press detected")
+        # Could show settings menu or trigger special action
+        # For now, just do the same as regular press
         self.menu_system.handle_action()
     
     def _on_go_button(self):
@@ -143,12 +152,6 @@ class DisplayManager:
         
         try:
             while self.running:
-                # Check for long press on ACTION button (could trigger special action)
-                if self.buttons.check_long_press("action", Config.BUTTON_ACTION):
-                    # Long press ACTION: could show settings or special menu
-                    if Config.DEBUG_MODE:
-                        print("ACTION long press detected")
-                
                 # Check flags from API
                 now = datetime.now()
                 if (now - self.last_flag_check).seconds >= 5:  # Check every 5 seconds
