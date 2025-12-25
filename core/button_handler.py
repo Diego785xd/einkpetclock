@@ -85,38 +85,59 @@ class ButtonHandler:
             print("Warning: Running without GPIO hardware")
             return
         
-        self.gpio.setmode(self.gpio.BCM)
-        
-        # Setup buttons with internal pull-up resistors
-        self.gpio.setup(Config.BUTTON_RETURN, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
-        self.gpio.setup(Config.BUTTON_ACTION, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
-        self.gpio.setup(Config.BUTTON_GO, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
-        
-        # Add event detection for button presses (FALLING = button pressed)
-        self.gpio.add_event_detect(
-            Config.BUTTON_RETURN,
-            self.gpio.FALLING,
-            callback=self._return_button_callback,
-            bouncetime=Config.BUTTON_DEBOUNCE_MS
-        )
-        self.gpio.add_event_detect(
-            Config.BUTTON_ACTION,
-            self.gpio.FALLING,
-            callback=self._action_button_callback,
-            bouncetime=Config.BUTTON_DEBOUNCE_MS
-        )
-        self.gpio.add_event_detect(
-            Config.BUTTON_GO,
-            self.gpio.FALLING,
-            callback=self._go_button_callback,
-            bouncetime=Config.BUTTON_DEBOUNCE_MS
-        )
-        
-        print("GPIO buttons initialized")
-        print(f"  RETURN: GPIO {Config.BUTTON_RETURN}")
-        print(f"  ACTION: GPIO {Config.BUTTON_ACTION}")
-        print(f"  GO:     GPIO {Config.BUTTON_GO}")
-    
+        try:
+            self.gpio.setmode(self.gpio.BCM)
+            
+            # Setup buttons with internal pull-up resistors
+            self.gpio.setup(Config.BUTTON_RETURN, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
+            self.gpio.setup(Config.BUTTON_ACTION, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
+            self.gpio.setup(Config.BUTTON_GO, self.gpio.IN, pull_up_down=self.gpio.PUD_UP)
+            
+            # Add event detection for button presses (FALLING = button pressed)
+            self.gpio.add_event_detect(
+                Config.BUTTON_RETURN,
+                self.gpio.FALLING,
+                callback=self._return_button_callback,
+            )
+            self.gpio.add_event_detect(
+                Config.BUTTON_ACTION,
+                self.gpio.FALLING,
+                callback=self._action_button_callback,
+                bouncetime=Config.BUTTON_DEBOUNCE_MS
+            )
+            self.gpio.add_event_detect(
+                Config.BUTTON_GO,
+                self.gpio.FALLING,
+                callback=self._go_button_callback,
+                bouncetime=Config.BUTTON_DEBOUNCE_MS
+            )
+            
+            print("GPIO buttons initialized")
+            print(f"  RETURN: GPIO {Config.BUTTON_RETURN}")
+            print(f"  ACTION: GPIO {Config.BUTTON_ACTION}")
+            print(f"  GO:     GPIO {Config.BUTTON_GO}")
+            
+        except RuntimeError as e:
+            print(f"\n{'='*60}")
+            print("ERROR: Failed to initialize GPIO")
+            print(f"{'='*60}")
+            print(f"Error: {e}")
+            print()
+            print("This usually means GPIO permission issues.")
+            print()
+            print("Quick fix (run on Pi):")
+            print("  sudo bash scripts/fix_gpio_permissions.sh")
+            print()
+            print("Or manually fix:")
+            print("  1. Run service as root:")
+            print("     sudo sed -i 's/^User=.*/User=root/' /etc/systemd/system/eink-display.service")
+            print("     sudo systemctl daemon-reload")
+            print("     sudo systemctl restart eink-display")
+            print()
+            print("  2. Or add user to gpio group (requires logout):")
+            print("     sudo usermod -a -G gpio $(whoami)")
+            print(f"{'='*60}\n")
+            raise
     def _debounce_check(self, button_name: str) -> bool:
         """Check if enough time has passed since last press"""
         now = time.time()

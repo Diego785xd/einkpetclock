@@ -194,9 +194,53 @@ ACTUAL_USER=$(whoami)
 ACTUAL_HOME="$HOME"
 
 echo ""
+echo "=== Configuring GPIO Permissions ==="
+
+# Check if gpio group exists, create if not
+if ! getent group gpio > /dev/null 2>&1; then
+    echo "Creating gpio group..."
+    sudo groupadd -f gpio
+fi
+
+# Add user to gpio group
+echo "Adding $ACTUAL_USER to gpio group..."
+sudo usermod -a -G gpio $ACTUAL_USER
+
+# Create udev rules for GPIO access
+echo "Setting up GPIO udev rules..."
+sudo tee /etc/udev/rules.d/99-gpio.rules > /dev/null << 'EOF'
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
+SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'chown -R root:gpio /sys/class/gpio && chmod -R 770 /sys/class/gpio; chown -R root:gpio /sys/devices/virtual/gpio && chmod -R 770 /sys/devices/virtual/gpio; chown -R root:gpio /sys$devpath && chmod -R 770 /sys$devpath'"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+echo "✓ GPIO permissions configured"
+echo "⚠  NOTE: For gpio group to take effect, you must logout and login again"
+echo "   OR run the service as root (will be configured below)"
+
+echo ""
 echo "=== Configuring Systemd Services (Bare Metal) ==="
 echo "User: $ACTUAL_USER"
 echo "Home: $ACTUAL_HOME"
+
+# Ask user preference for GPIO permissions
+echo ""
+echo "GPIO Permission Options:"
+echo "  1. Run as root (works immediately, less secure)"
+echo "  2. Run as user with gpio group (need logout/login, more secure)"
+echo ""
+read -p "Enter choice (1 or 2, default=1): " GPIO_CHOICE
+GPIO_CHOICE=${GPIO_CHOICE:-1}
+
+if [ "$GPIO_CHOICE" = "1" ]; then
+    SERVICE_USER="root"
+    echo "✓ Will run display service as root"
+else
+    SERVICE_USER="$ACTUAL_USER"
+    echo "✓ Will run display service as $ACTUAL_USER (remember to logout/login)"
+fi
 
 # Create display service (BARE METAL - no venv)
 cat > "$PROJECT_DIR/systemd/eink-display.service" << EOF
@@ -206,7 +250,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=$ACTUAL_USER
+User=$SERVICE_USER
 WorkingDirectory=$PROJECT_DIR
 Environment="PYTHONPATH=$WAVESHARE_LIB"
 ExecStart=/usr/bin/python3 -m core.display_manager
