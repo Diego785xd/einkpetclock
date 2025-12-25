@@ -45,7 +45,8 @@ PACKAGES=(
     "python3-dotenv"      # For .env file support
     "python3-tz"          # For timezone support (pytz)
     "python3-pil"         # For image handling
-    "python3-rpi.gpio"    # For GPIO button handling
+    "python3-gpiozero"    # For GPIO button handling (preferred)
+    "python3-rpi.gpio"    # For GPIO fallback
     "python3-fastapi"     # For API (if available)
     "python3-uvicorn"     # For API server (if available)
     "python3-httpx"       # For HTTP client (if available)
