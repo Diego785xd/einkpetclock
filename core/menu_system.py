@@ -83,37 +83,46 @@ class TamagotchiMenu(Menu):
         self.display.draw_line((10, 50, 240, 50))
         
         # Pet sprite area (center)
-        # TODO: Load actual bunny sprite
-        # For now, draw a simple placeholder
-        pet_x, pet_y = 105, 65
-        self.display.draw_text((pet_x, pet_y), "🐰", 'large')
+        # TODO: Load actual bunny sprite from assets/sprites/
+        # For now, draw ASCII art placeholder
+        pet_x, pet_y = 90, 50
+        
+        # Simple ASCII bunny
+        bunny_art = [
+            "(\\___/)",
+            "( o.o )",
+            " > ^ <"
+        ]
+        for i, line in enumerate(bunny_art):
+            self.display.draw_text((pet_x, pet_y + i * 12), line, 'small')
         
         # Pet stats (bottom)
         stats_y = 95
         
-        # Health hearts
-        hearts = "❤️" * min(pet.health, 3)
-        self.display.draw_text((10, stats_y), hearts, 'small')
+        # Health indicator (using <3 instead of hearts)
+        health_icons = "<3 " * min(pet.health // 3, 3)
+        self.display.draw_text((10, stats_y), health_icons or "HP:0", 'small')
         
-        # Hunger indicator
-        hunger_bars = "🍔" * max(0, min(3, pet.hunger // 3))
-        self.display.draw_text((70, stats_y), hunger_bars or "✓", 'small')
+        # Hunger indicator (using asterisks for food level)
+        hunger_level = max(0, min(3, pet.hunger // 3))
+        hunger_bars = "*" * hunger_level if hunger_level > 0 else "FED"
+        self.display.draw_text((70, stats_y), hunger_bars, 'small')
         
-        # Happiness indicator
+        # Happiness indicator (using ASCII since emojis need special fonts)
         mood = pet.get_mood()
-        mood_emoji = {
-            "happy": "😊",
-            "neutral": "😐",
-            "sad": "😢",
-            "hungry": "😋",
-            "sick": "🤒"
-        }.get(mood, "😐")
-        self.display.draw_text((130, stats_y), mood_emoji, 'small')
+        mood_icon = {
+            "happy": ":)",
+            "neutral": ":|",
+            "sad": ":(",
+            "hungry": ":P",
+            "sick": ":X"
+        }.get(mood, ":|")
+        self.display.draw_text((130, stats_y), mood_icon, 'small')
         
         # Unread message indicator
         unread = msg_log.get_unread_count()
         if unread > 0:
-            self.display.draw_text((200, stats_y), f"✉️{unread}", 'small')
+            self.display.draw_text((195, stats_y), f"MSG:{unread}", 'small')
         
         # Network error indicator
         if stats.get("last_error"):
