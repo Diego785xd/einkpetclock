@@ -72,7 +72,11 @@ Should see 47 PNG files.
 ## Expected Result
 
 The e-ink display should now show:
-- **Custom bunny sprite** in the center (32x32 pixels)
+- **Date** in top left corner (medium size)
+- **Time** in HUGE letters on the left side (main focus - this is a clock!)
+- **64x64 bunny sprite** on the right side, aligned with time (DOUBLE SIZE)
+- **Status bar** at bottom with pet stats (health, hunger, mood, messages)
+- **Button hints** at very bottom
 - Sprite changes based on pet mood:
   - Happy bunny when well-fed
   - Sleeping bunny at night
@@ -80,6 +84,19 @@ The e-ink display should now show:
   - Sick bunny when health is low
   - Excited/running bunny when hungry
   - Dead bunny if health reaches zero
+
+### Layout Visual
+```
+┌───────────────────────────────────┐
+│ Tue, Dec 24                     ! │
+│                                   │
+│  10:30 AM        [BUNNY 64x64]   │
+│                                   │
+├───────────────────────────────────┤
+│ <3 <3 <3  ***  :)  MSG:2         │
+│ [Feed]    [Msg]              [>] │
+└───────────────────────────────────┘
+```
 
 ## Mood → Sprite Mapping
 

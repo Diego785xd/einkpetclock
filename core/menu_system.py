@@ -66,7 +66,7 @@ class TamagotchiMenu(Menu):
     """Main menu with tamagotchi and clock"""
     
     def render(self):
-        """Render tamagotchi clock view"""
+        """Render tamagotchi clock view with clock-focused layout"""
         img, draw = self.display.create_canvas()
         
         pet = get_pet_state()
@@ -77,17 +77,15 @@ class TamagotchiMenu(Menu):
         time_str = self.get_current_time_str()
         date_str = self.get_current_date_str()
         
-        # Layout
-        # Top section: Time (large)
-        self.display.draw_text_centered(5, time_str, 'xlarge')
+        # NEW LAYOUT:
+        # Top left: Date (small)
+        self.display.draw_text((5, 5), date_str, 'medium')
         
-        # Date below time
-        self.display.draw_text_centered(40, date_str, 'small')
+        # Center-left: HUGE Time (main focus)
+        # Using xlarge font, positioned prominently
+        self.display.draw_text((10, 25), time_str, 'xlarge')
         
-        # Divider line
-        self.display.draw_line((10, 50, 240, 50))
-        
-        # Load and display bunny sprite based on mood
+        # Right side: Bunny sprite (64x64 - double size)
         mood = pet.get_mood()
         sprite_filename = {
             "happy": "happy.png",
@@ -102,18 +100,19 @@ class TamagotchiMenu(Menu):
         sprite_path = SPRITES_DIR / sprite_filename
         
         if sprite_path.exists():
-            # Load sprite and paste at center
+            # Load sprite and resize to 64x64 (double size)
             sprite = Image.open(sprite_path)
-            # Calculate position to center the 32x32 sprite
-            # Display is 250x122, center X is around 109, Y around 60
-            sprite_x = (250 - 32) // 2  # Center horizontally
-            sprite_y = 60  # Position below date line
+            sprite_large = sprite.resize((64, 64), Image.NEAREST)  # NEAREST for pixel art
+            
+            # Position on right side, aligned with time
+            sprite_x = 250 - 64 - 10  # Right side with 10px margin
+            sprite_y = 25  # Same vertical position as time
             
             # Paste sprite onto the canvas
-            img.paste(sprite, (sprite_x, sprite_y))
+            img.paste(sprite_large, (sprite_x, sprite_y))
         else:
             # Fallback to ASCII art if sprite not found
-            pet_x, pet_y = 90, 50
+            pet_x, pet_y = 180, 30
             bunny_art = [
                 "(\\___/)",
                 "( o.o )",
@@ -122,20 +121,22 @@ class TamagotchiMenu(Menu):
             for i, line in enumerate(bunny_art):
                 self.display.draw_text((pet_x, pet_y + i * 12), line, 'small')
         
-        # Pet stats (bottom)
-        stats_y = 95
+        # Bottom bar separator line
+        self.display.draw_line((0, 95, 250, 95))
         
-        # Health indicator (using <3 instead of hearts)
+        # Pet stats (bottom bar - condensed)
+        stats_y = 98
+        
+        # Health indicator
         health_icons = "<3 " * min(pet.health // 3, 3)
-        self.display.draw_text((10, stats_y), health_icons or "HP:0", 'small')
+        self.display.draw_text((5, stats_y), health_icons or "HP:0", 'small')
         
-        # Hunger indicator (using asterisks for food level)
+        # Hunger indicator
         hunger_level = max(0, min(3, pet.hunger // 3))
         hunger_bars = "*" * hunger_level if hunger_level > 0 else "FED"
-        self.display.draw_text((70, stats_y), hunger_bars, 'small')
+        self.display.draw_text((50, stats_y), hunger_bars, 'small')
         
-        # Happiness indicator (using ASCII since emojis need special fonts)
-        mood = pet.get_mood()
+        # Mood indicator
         mood_icon = {
             "happy": ":)",
             "neutral": ":|",
@@ -143,16 +144,16 @@ class TamagotchiMenu(Menu):
             "hungry": ":P",
             "sick": ":X"
         }.get(mood, ":|")
-        self.display.draw_text((130, stats_y), mood_icon, 'small')
+        self.display.draw_text((90, stats_y), mood_icon, 'small')
         
         # Unread message indicator
         unread = msg_log.get_unread_count()
         if unread > 0:
-            self.display.draw_text((195, stats_y), f"MSG:{unread}", 'small')
+            self.display.draw_text((120, stats_y), f"MSG:{unread}", 'small')
         
-        # Network error indicator
+        # Network error indicator (top right corner)
         if stats.get("last_error"):
-            self.display.draw_text((220, 5), "⚠️", 'small')
+            self.display.draw_text((230, 5), "!", 'small')
         
         # Button hints (very bottom)
         self.display.draw_text((5, 110), "[Feed]", 'small')
