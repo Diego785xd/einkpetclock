@@ -6,10 +6,15 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List
 import pytz
+from pathlib import Path
+from PIL import Image
 
 from core.config import Config
 from core.display import DisplayManager
 from core.state import get_pet_state, get_message_log, get_settings, get_stats
+
+# Path to sprite assets
+SPRITES_DIR = Path(__file__).parent.parent / "assets" / "sprites"
 
 
 class Menu(ABC):
@@ -82,19 +87,40 @@ class TamagotchiMenu(Menu):
         # Divider line
         self.display.draw_line((10, 50, 240, 50))
         
-        # Pet sprite area (center)
-        # TODO: Load actual bunny sprite from assets/sprites/
-        # For now, draw ASCII art placeholder
-        pet_x, pet_y = 90, 50
+        # Load and display bunny sprite based on mood
+        mood = pet.get_mood()
+        sprite_filename = {
+            "happy": "happy.png",
+            "neutral": "neutral.png",
+            "sad": "sad.png",
+            "hungry": "excited.png",  # Use excited/run animation for hungry
+            "sick": "sick.png",
+            "sleeping": "sleeping.png",
+            "dead": "dead.png"
+        }.get(mood, "neutral.png")
         
-        # Simple ASCII bunny
-        bunny_art = [
-            "(\\___/)",
-            "( o.o )",
-            " > ^ <"
-        ]
-        for i, line in enumerate(bunny_art):
-            self.display.draw_text((pet_x, pet_y + i * 12), line, 'small')
+        sprite_path = SPRITES_DIR / sprite_filename
+        
+        if sprite_path.exists():
+            # Load sprite and paste at center
+            sprite = Image.open(sprite_path)
+            # Calculate position to center the 32x32 sprite
+            # Display is 250x122, center X is around 109, Y around 60
+            sprite_x = (250 - 32) // 2  # Center horizontally
+            sprite_y = 60  # Position below date line
+            
+            # Paste sprite onto the canvas
+            img.paste(sprite, (sprite_x, sprite_y))
+        else:
+            # Fallback to ASCII art if sprite not found
+            pet_x, pet_y = 90, 50
+            bunny_art = [
+                "(\\___/)",
+                "( o.o )",
+                " > ^ <"
+            ]
+            for i, line in enumerate(bunny_art):
+                self.display.draw_text((pet_x, pet_y + i * 12), line, 'small')
         
         # Pet stats (bottom)
         stats_y = 95
