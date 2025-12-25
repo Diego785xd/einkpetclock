@@ -72,11 +72,12 @@ Should see 47 PNG files.
 ## Expected Result
 
 The e-ink display should now show:
-- **Date** in top left corner (medium size)
-- **Time** in HUGE letters on the left side (main focus - this is a clock!)
+- **Date** in top left corner (medium - 16pt)
+- **Time** in GIANT letters on the left side (64pt - same height as bunny!)
 - **64x64 bunny sprite** on the right side, aligned with time (DOUBLE SIZE)
 - **Status bar** at bottom with pet stats (health, hunger, mood, messages)
 - **Button hints** at very bottom
+- Time and bunny are now the SAME HEIGHT (64 pixels) for perfect visual balance!
 - Sprite changes based on pet mood:
   - Happy bunny when well-fed
   - Sleeping bunny at night
@@ -87,15 +88,15 @@ The e-ink display should now show:
 
 ### Layout Visual
 ```
-┌───────────────────────────────────┐
-│ Tue, Dec 24                     ! │
-│                                   │
-│  10:30 AM        [BUNNY 64x64]   │
-│                                   │
-├───────────────────────────────────┤
-│ <3 <3 <3  ***  :)  MSG:2         │
-│ [Feed]    [Msg]              [>] │
-└───────────────────────────────────┘
+┌────────────────────────────────────┐
+│ Tue, Dec 24                      ! │
+│                                    │
+│  ██ ███ ██ ███       [BUNNY 64x64]│ ← Both 64px tall!
+│  ███ ███ ██  ██                   │
+├────────────────────────────────────┤
+│ <3 <3 <3  ***  :)  MSG:2          │
+│ [Feed]    [Msg]              [>]  │
+└────────────────────────────────────┘
 ```
 
 ## Mood → Sprite Mapping

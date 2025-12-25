@@ -84,6 +84,7 @@ class DisplayManager:
                 'medium': ImageFont.truetype(str(font_dir / "Font.ttc"), 16),
                 'large': ImageFont.truetype(str(font_dir / "Font.ttc"), 24),
                 'xlarge': ImageFont.truetype(str(font_dir / "Font.ttc"), 32),
+                'giant': ImageFont.truetype(str(font_dir / "Font.ttc"), 64),  # Huge clock digits
             }
         except:
             # Fall back to default font
@@ -94,6 +95,7 @@ class DisplayManager:
                 'medium': default_font,
                 'large': default_font,
                 'xlarge': default_font,
+                'giant': default_font,
             }
     
     def init(self):

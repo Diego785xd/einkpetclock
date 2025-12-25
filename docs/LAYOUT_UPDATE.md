@@ -85,10 +85,20 @@ sprite_large = sprite.resize((64, 64), Image.NEAREST)
 
 ### Position Calculations
 ```python
+# Time with giant 64pt font (same height as sprite)
+self.display.draw_text((10, 25), time_str, 'giant')
+
 # Sprite on right side with 10px margin
 sprite_x = 250 - 64 - 10  # = 176
 sprite_y = 25  # Aligned with time
 ```
+
+### Font Sizes
+- **small**: 12pt - For labels and stats
+- **medium**: 16pt - For date
+- **large**: 24pt - For headings
+- **xlarge**: 32pt - For emphasis
+- **giant**: 64pt - **NEW!** For clock digits (same height as 64px sprite)
 
 ### Display Dimensions
 - Total width: 250 pixels

@@ -81,9 +81,8 @@ class TamagotchiMenu(Menu):
         # Top left: Date (small)
         self.display.draw_text((5, 5), date_str, 'medium')
         
-        # Center-left: HUGE Time (main focus)
-        # Using xlarge font, positioned prominently
-        self.display.draw_text((10, 25), time_str, 'xlarge')
+        # Center-left: GIANT Time (64pt - same height as bunny sprite)
+        self.display.draw_text((10, 25), time_str, 'giant')
         
         # Right side: Bunny sprite (64x64 - double size)
         mood = pet.get_mood()
