@@ -3,6 +3,8 @@ GPIO Button Handler for E-Ink Pet Clock using gpiozero
 Handles button presses with debouncing and callbacks
 """
 from typing import Callable, Optional
+import time
+import threading
 from core.config import Config
 
 # Try to import gpiozero
@@ -42,7 +44,7 @@ class MockButton:
 
 
 class ButtonHandler:
-    """Handles button inputs using gpiozero library"""
+    """Handles button inputs using gpiozero library with callback protection"""
     
     def __init__(self):
         self.callbacks = {
@@ -51,7 +53,32 @@ class ButtonHandler:
             "action_hold": None,
             "go_press": None,
         }
+        
+        # Callback protection
+        self._callback_lock = threading.Lock()
+        self._callback_running = False
+        
         self._setup_buttons()
+    
+    def _safe_callback(self, callback_name: str):
+        """Execute callback safely with lock protection"""
+        # Try to acquire lock - if already processing, skip this press
+        acquired = self._callback_lock.acquire(blocking=False)
+        if not acquired:
+            print(f"⚠ Callback {callback_name} skipped - previous callback still running")
+            return
+        
+        try:
+            self._callback_running = True
+            callback = self.callbacks.get(callback_name)
+            if callback:
+                try:
+                    callback()
+                except Exception as e:
+                    print(f"Error in button callback {callback_name}: {e}")
+        finally:
+            self._callback_running = False
+            self._callback_lock.release()
     
     def _setup_buttons(self):
         """Initialize GPIO buttons with gpiozero"""
@@ -79,20 +106,16 @@ class ButtonHandler:
             self.button_go = MockButton(Config.BUTTON_GO)
     
     def _return_pressed(self):
-        if self.callbacks["return_press"]:
-            self.callbacks["return_press"]()
+        self._safe_callback("return_press")
     
     def _action_pressed(self):
-        if self.callbacks["action_press"]:
-            self.callbacks["action_press"]()
+        self._safe_callback("action_press")
     
     def _action_held(self):
-        if self.callbacks["action_hold"]:
-            self.callbacks["action_hold"]()
+        self._safe_callback("action_hold")
     
     def _go_pressed(self):
-        if self.callbacks["go_press"]:
-            self.callbacks["go_press"]()
+        self._safe_callback("go_press")
     
     def on_return_press(self, callback: Callable):
         self.callbacks["return_press"] = callback

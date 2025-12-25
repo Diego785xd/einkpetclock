@@ -1,11 +1,26 @@
 #!/bin/bash
-# Deploy sprite updates to Raspberry Pi
+# De# Copy sprites directory
+echo "📦 Syncing sprites..."
+rsync -avz --progress \
+    assets/sprites/ \
+    "$PI_USER@$PI_IP:$PROJECT_DIR/assets/sprites/"
+
+echo ""
+echo "📦 Syncing updated core files..."
+rsync -avz --progress \
+    core/menu_system.py \
+    core/display.py \
+    "$PI_USER@$PI_IP:$PROJECT_DIR/core/"
+
+echo ""
+echo "🔄 Restarting display service..."
+ssh "$PI_USER@$PI_IP" "sudo systemctl restart eink-display.service"ates to Raspberry Pi
 
 set -e
 
-PI_USER="rossi"
-PI_IP="10.8.17.62"
-PROJECT_DIR="/home/rossi/einkpetclock"
+PI_USER="dai"
+PI_IP="relojdai.local"
+PROJECT_DIR="/home/dai/einkpetclock"
 
 echo "============================================================"
 echo "Deploying Sprites to Raspberry Pi"

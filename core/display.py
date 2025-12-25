@@ -65,6 +65,7 @@ class DisplayManager:
         # Refresh tracking
         self.update_count = 0
         self.last_full_refresh = 0
+        self.base_image_set = False  # Track if base image is set for partial updates
         
         # Fonts
         self.fonts = {}
@@ -84,7 +85,8 @@ class DisplayManager:
                 'medium': ImageFont.truetype(str(font_dir / "Font.ttc"), 16),
                 'large': ImageFont.truetype(str(font_dir / "Font.ttc"), 24),
                 'xlarge': ImageFont.truetype(str(font_dir / "Font.ttc"), 32),
-                'giant': ImageFont.truetype(str(font_dir / "Font.ttc"), 64),  # Huge clock digits
+                'huge': ImageFont.truetype(str(font_dir / "Font.ttc"), 48),  # Big clock digits
+                'giant': ImageFont.truetype(str(font_dir / "Font.ttc"), 64),  # Massive (may be too big)
             }
         except:
             # Fall back to default font
@@ -95,6 +97,7 @@ class DisplayManager:
                 'medium': default_font,
                 'large': default_font,
                 'xlarge': default_font,
+                'huge': default_font,
                 'giant': default_font,
             }
     
@@ -119,12 +122,13 @@ class DisplayManager:
         self.draw = ImageDraw.Draw(self.image)
         return self.image, self.draw
     
-    def display(self, use_partial: bool = True):
+    def display(self, use_partial: bool = True, partial_mode: str = "fast"):
         """
         Display the current image buffer
         
         Args:
             use_partial: Use partial refresh if True, full refresh if False
+            partial_mode: "fast" for display_fast() or "true" for displayPartial()
         """
         if self.image is None:
             print("Warning: No image to display")
@@ -136,25 +140,52 @@ class DisplayManager:
         force_full = (self.update_count - self.last_full_refresh) >= Config.FULL_REFRESH_CYCLES
         
         if use_partial and not force_full:
-            # Partial refresh (faster, but can cause ghosting)
+            # Partial refresh
             if HAS_EPD:
                 if not self.initialized:
                     self.init_fast()
-                self.epd.display_fast(self.epd.getbuffer(self.image))
+                
+                if partial_mode == "true":
+                    # True partial update - only updates changed pixels
+                    if not self.base_image_set:
+                        # Set base image first time
+                        self.epd.displayPartBaseImage(self.epd.getbuffer(self.image))
+                        self.base_image_set = True
+                        if Config.DEBUG_MODE:
+                            print(f"Display update #{self.update_count} (base image set)")
+                    else:
+                        # Partial update - only changed areas
+                        self.epd.displayPartial(self.epd.getbuffer(self.image))
+                        if Config.DEBUG_MODE:
+                            print(f"Display update #{self.update_count} (true partial)")
+                else:
+                    # Fast mode - whole screen but faster
+                    self.epd.display_fast(self.epd.getbuffer(self.image))
+                    if Config.DEBUG_MODE:
+                        print(f"Display update #{self.update_count} (fast)")
             else:
                 self.epd.display_fast(self.epd.getbuffer(self.image))
             
-            if Config.DEBUG_MODE:
-                print(f"Display update #{self.update_count} (partial)")
         else:
             # Full refresh (clears ghosting)
             if not self.initialized:
                 self.init()
             self.epd.display(self.epd.getbuffer(self.image))
             self.last_full_refresh = self.update_count
+            self.base_image_set = False  # Reset base image after full refresh
             
             if Config.DEBUG_MODE:
                 print(f"Display update #{self.update_count} (full)")
+    
+    def set_base_image(self):
+        """Set current image as base for partial updates"""
+        if HAS_EPD and self.image is not None:
+            if not self.initialized:
+                self.init_fast()
+            self.epd.displayPartBaseImage(self.epd.getbuffer(self.image))
+            self.base_image_set = True
+            if Config.DEBUG_MODE:
+                print("Base image set for partial updates")
     
     def clear(self):
         """Clear display to white"""

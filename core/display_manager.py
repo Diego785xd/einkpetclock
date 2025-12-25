@@ -31,6 +31,8 @@ class DisplayManager:
         self.last_clock_update = datetime.now()
         self.last_pet_update = datetime.now()
         self.last_flag_check = datetime.now()
+        self.last_animation_update = datetime.now()
+        self.last_full_refresh = datetime.now()  # Track last full refresh for 5-minute cycle
         
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -66,27 +68,43 @@ class DisplayManager:
     
     def _on_return_button(self):
         """Handle RETURN button press"""
-        self.stats.increment("total_button_presses")
-        self.menu_system.handle_return()
-        self.menu_system.request_render()
+        try:
+            self.stats.increment("total_button_presses")
+            self.menu_system.handle_return()
+            self.menu_system.request_render()
+        except Exception as e:
+            print(f"Error handling RETURN button: {e}")
+            self.stats.record_error(f"RETURN button: {e}")
     
     def _on_action_button(self):
         """Handle ACTION button press"""
-        self.stats.increment("total_button_presses")
-        self.menu_system.handle_action()
+        try:
+            self.stats.increment("total_button_presses")
+            self.menu_system.handle_action()
+        except Exception as e:
+            print(f"Error handling ACTION button: {e}")
+            self.stats.record_error(f"ACTION button: {e}")
     
     def _on_action_long_press(self):
         """Handle ACTION button long press (hold)"""
-        if Config.DEBUG_MODE:
-            print("ACTION long press detected")
-        # Could show settings menu or trigger special action
-        # For now, just do the same as regular press
-        self.menu_system.handle_action()
+        try:
+            if Config.DEBUG_MODE:
+                print("ACTION long press detected")
+            # Could show settings menu or trigger special action
+            # For now, just do the same as regular press
+            self.menu_system.handle_action()
+        except Exception as e:
+            print(f"Error handling ACTION long press: {e}")
+            self.stats.record_error(f"ACTION hold: {e}")
     
     def _on_go_button(self):
         """Handle GO button press"""
-        self.stats.increment("total_button_presses")
-        self.menu_system.handle_go()
+        try:
+            self.stats.increment("total_button_presses")
+            self.menu_system.handle_go()
+        except Exception as e:
+            print(f"Error handling GO button: {e}")
+            self.stats.record_error(f"GO button: {e}")
     
     def check_flags(self):
         """Check for flags from API service"""
@@ -116,13 +134,27 @@ class DisplayManager:
         """Update clock display (called periodically)"""
         now = datetime.now()
         
+        # Skip if in menu transition
+        if self.menu_system.is_in_transition():
+            return
+        
         # Only update every minute
         if (now - self.last_clock_update).seconds >= Config.CLOCK_UPDATE_INTERVAL:
             self.last_clock_update = now
             
-            # If on main menu, re-render to update time
+            # If on main menu, update only the time area
             if self.menu_system.current_menu_index == 0:
-                self.menu_system.request_render()
+                main_menu = self.menu_system.menus[0]
+                if hasattr(main_menu, 'update_time_only'):
+                    try:
+                        main_menu.update_time_only()
+                    except Exception as e:
+                        print(f"Error updating time: {e}")
+                        # Reset base image on error
+                        if hasattr(main_menu, 'base_image_set'):
+                            main_menu.base_image_set = False
+                else:
+                    self.menu_system.request_render()
                 self.stats.increment("total_display_updates")
     
     def update_pet_state(self):
@@ -142,6 +174,61 @@ class DisplayManager:
             
             if Config.DEBUG_MODE:
                 print(f"Pet updated: H:{self.pet.health} F:{10-self.pet.hunger} M:{self.pet.happiness} Mood:{self.pet.get_mood()}")
+    
+    def update_animation(self):
+        """Update animation frame"""
+        now = datetime.now()
+        
+        # Skip if in menu transition
+        if self.menu_system.is_in_transition():
+            return
+        
+        # Update every 0.5 seconds
+        time_diff = (now - self.last_animation_update).total_seconds()
+        if time_diff >= 0.5:
+            self.last_animation_update = now
+            
+            # Only animate on main menu
+            if self.menu_system.current_menu_index == 0:
+                # Get the main menu and advance frame, then update only sprite area
+                main_menu = self.menu_system.menus[0]
+                if hasattr(main_menu, 'advance_frame') and hasattr(main_menu, 'update_sprite_only'):
+                    try:
+                        main_menu.advance_frame()
+                        main_menu.update_sprite_only()
+                    except Exception as e:
+                        print(f"Error updating sprite animation: {e}")
+                        # Reset base image on error
+                        if hasattr(main_menu, 'base_image_set'):
+                            main_menu.base_image_set = False
+    
+    def check_full_refresh_needed(self):
+        """Check if 5 minutes have passed and do a full refresh"""
+        now = datetime.now()
+        time_diff = (now - self.last_full_refresh).total_seconds()
+        
+        # Skip if in menu transition
+        if self.menu_system.is_in_transition():
+            return
+        
+        # Full refresh every 5 minutes (300 seconds)
+        if time_diff >= 300:
+            self.last_full_refresh = now
+            
+            # If on main menu, do full refresh
+            if self.menu_system.current_menu_index == 0:
+                main_menu = self.menu_system.menus[0]
+                if hasattr(main_menu, 'render_full'):
+                    print("Performing scheduled full refresh (5 min interval)")
+                    try:
+                        main_menu.render_full()
+                    except Exception as e:
+                        print(f"Error during scheduled full refresh: {e}")
+                        # Try to recover
+                        if hasattr(main_menu, 'base_image_set'):
+                            main_menu.base_image_set = False
+                else:
+                    self.menu_system.request_render()
     
     def run(self):
         """Main event loop"""
@@ -164,7 +251,13 @@ class DisplayManager:
                 # Update pet state periodically
                 self.update_pet_state()
                 
-                # Render if needed
+                # Update animation frame
+                self.update_animation()
+                
+                # Check if full refresh needed (every 5 minutes)
+                self.check_full_refresh_needed()
+                
+                # Render if needed (for menu changes, etc.)
                 self.menu_system.render_current()
                 
                 # Sleep to reduce CPU usage
