@@ -49,10 +49,10 @@ class DisplayManager:
         # Initialize display
         self.display.init()
         
-        # Register button callbacks
-        self.buttons.on_return(self._on_return_button)
-        self.buttons.on_action(self._on_action_button)
-        self.buttons.on_go(self._on_go_button)
+        # Register button callbacks (using gpiozero API)
+        self.buttons.on_return_press(self._on_return_button)
+        self.buttons.on_action_press(self._on_action_button)
+        self.buttons.on_go_press(self._on_go_button)
         
         # Initial render
         self.menu_system.render_current()
