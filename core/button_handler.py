@@ -1,10 +1,10 @@
 """
 GPIO Button Handler for E-Ink Pet Clock using gpiozero
-Handles button presses with debouncing and callbacks
+Handles button presses with debouncing and event queue
 """
-from typing import Callable, Optional
+from typing import Optional
 import time
-import threading
+import queue
 from core.config import Config
 
 # Try to import gpiozero
@@ -44,41 +44,60 @@ class MockButton:
 
 
 class ButtonHandler:
-    """Handles button inputs using gpiozero library with callback protection"""
+    """Handles button inputs using gpiozero library with event queue"""
     
     def __init__(self):
-        self.callbacks = {
-            "return_press": None,
-            "action_press": None,
-            "action_hold": None,
-            "go_press": None,
-        }
+        # Event queue with maxsize=1: only keeps the most recent event
+        # This acts as a natural debouncer - new presses overwrite pending ones
+        self.event_queue = queue.Queue(maxsize=1)
         
-        # Callback protection
-        self._callback_lock = threading.Lock()
-        self._callback_running = False
+        # Last button press time for additional debouncing
+        self._last_button_time = {}
+        self._debounce_seconds = 0.2  # 200ms software debounce
         
         self._setup_buttons()
     
-    def _safe_callback(self, callback_name: str):
-        """Execute callback safely with lock protection"""
-        # Try to acquire lock - if already processing, skip this press
-        acquired = self._callback_lock.acquire(blocking=False)
-        if not acquired:
-            print(f"⚠ Callback {callback_name} skipped - previous callback still running")
+    def _queue_event(self, button_name: str):
+        """Queue a button event (non-blocking, instant return)"""
+        # Software debounce check
+        now = time.time()
+        last_time = self._last_button_time.get(button_name, 0)
+        
+        if now - last_time < self._debounce_seconds:
+            # Too soon after last press of this button, ignore
             return
         
+        self._last_button_time[button_name] = now
+        
+        # Try to put event in queue
+        # If queue is full (already has an event), this will fail silently
+        # which is what we want - the pending event is still valid
         try:
-            self._callback_running = True
-            callback = self.callbacks.get(callback_name)
-            if callback:
-                try:
-                    callback()
-                except Exception as e:
-                    print(f"Error in button callback {callback_name}: {e}")
-        finally:
-            self._callback_running = False
-            self._callback_lock.release()
+            self.event_queue.put_nowait(button_name)
+        except queue.Full:
+            # Queue already has an event, that's fine
+            # The user will process that one first
+            if Config.DEBUG_MODE:
+                print(f"⚠ Event queue full, {button_name} press will be processed next")
+    
+    def get_event(self, timeout: float = 0) -> Optional[str]:
+        """
+        Get the next button event from queue (non-blocking by default)
+        
+        Args:
+            timeout: Seconds to wait for event (0 = non-blocking)
+            
+        Returns:
+            Button name string or None if no event
+        """
+        try:
+            return self.event_queue.get(block=(timeout > 0), timeout=timeout if timeout > 0 else None)
+        except queue.Empty:
+            return None
+    
+    def has_event(self) -> bool:
+        """Check if there's a pending button event"""
+        return not self.event_queue.empty()
     
     def _setup_buttons(self):
         """Initialize GPIO buttons with gpiozero"""
@@ -90,12 +109,13 @@ class ButtonHandler:
             self.button_action = GPIOZeroButton(Config.BUTTON_ACTION, pull_up=True, bounce_time=debounce_sec, hold_time=hold_time_sec)
             self.button_go = GPIOZeroButton(Config.BUTTON_GO, pull_up=True, bounce_time=debounce_sec, hold_time=hold_time_sec)
             
-            self.button_return.when_pressed = self._return_pressed
-            self.button_action.when_pressed = self._action_pressed
-            self.button_action.when_held = self._action_held
-            self.button_go.when_pressed = self._go_pressed
+            # Set up callbacks to queue events (instant, non-blocking)
+            self.button_return.when_pressed = lambda: self._queue_event("return_press")
+            self.button_action.when_pressed = lambda: self._queue_event("action_press")
+            self.button_action.when_held = lambda: self._queue_event("action_hold")
+            self.button_go.when_pressed = lambda: self._queue_event("go_press")
             
-            print("✓ GPIO buttons initialized with gpiozero")
+            print("✓ GPIO buttons initialized with gpiozero (event queue mode)")
             print(f"  RETURN: GPIO {Config.BUTTON_RETURN}")
             print(f"  ACTION: GPIO {Config.BUTTON_ACTION}")
             print(f"  GO:     GPIO {Config.BUTTON_GO}")
@@ -104,30 +124,6 @@ class ButtonHandler:
             self.button_return = MockButton(Config.BUTTON_RETURN)
             self.button_action = MockButton(Config.BUTTON_ACTION)
             self.button_go = MockButton(Config.BUTTON_GO)
-    
-    def _return_pressed(self):
-        self._safe_callback("return_press")
-    
-    def _action_pressed(self):
-        self._safe_callback("action_press")
-    
-    def _action_held(self):
-        self._safe_callback("action_hold")
-    
-    def _go_pressed(self):
-        self._safe_callback("go_press")
-    
-    def on_return_press(self, callback: Callable):
-        self.callbacks["return_press"] = callback
-    
-    def on_action_press(self, callback: Callable):
-        self.callbacks["action_press"] = callback
-    
-    def on_action_hold(self, callback: Callable):
-        self.callbacks["action_hold"] = callback
-    
-    def on_go_press(self, callback: Callable):
-        self.callbacks["go_press"] = callback
     
     def cleanup(self):
         if HAS_GPIOZERO:

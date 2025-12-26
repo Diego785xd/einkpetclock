@@ -8,7 +8,6 @@ from typing import Optional, List
 import pytz
 from pathlib import Path
 from PIL import Image
-import threading
 import time
 
 from core.config import Config
@@ -233,8 +232,8 @@ class TamagotchiMenu(Menu):
         
         # Button hints (very bottom, below divider)
         self.display.draw_text((3, 109), "[Feed]", 'small')
-        self.display.draw_text((85, 109), "[Menu]", 'small')
-        self.display.draw_text((215, 109), "[>]", 'small')
+        self.display.draw_text((88, 109), "[Menu>]", 'small')
+        self.display.draw_text((205, 109), "[Poke]", 'small')
         
         # Display strategy
         if is_base_render or not self.base_image_set:
@@ -423,25 +422,24 @@ class MessagesMenu(Menu):
                 y_offset += 16
         
         # Button hints
-        self.display.draw_text((5, 110), "[Back]", 'small')
-        self.display.draw_text((80, 110), "[Read]", 'small')
-        self.display.draw_text((210, 110), "[>]", 'small')
+        self.display.draw_text((3, 110), "[Del]", 'small')
+        self.display.draw_text((88, 110), "[Menu>]", 'small')
+        self.display.draw_text((205, 110), "[Read]", 'small')
         
         self.display.display(use_partial=use_partial)
     
     def on_return(self):
-        """Go back (will be handled by menu state machine)"""
-        pass
+        """Delete the most recent message"""
+        msg_log = get_message_log()
+        msg_log.delete_most_recent()
+        self.selected_index = 0  # Reset selection
+        self.render()
     
     def on_go(self):
-        """Navigate messages or mark as read"""
+        """Mark all messages as read"""
         msg_log = get_message_log()
-        messages = msg_log.get_messages(limit=5)
-        
-        if messages:
-            self.selected_index = (self.selected_index + 1) % min(len(messages), 3)
-            msg_log.mark_all_read()
-            self.render()
+        msg_log.mark_all_read()
+        self.render()
 
 
 class StatsMenu(Menu):
@@ -493,20 +491,18 @@ class StatsMenu(Menu):
         # Current stats
         self.display.draw_text((10, y), f"H:{pet.health} F:{10-pet.hunger} M:{pet.happiness}", 'small')
         
-        # Button hints
-        self.display.draw_text((5, 110), "[Back]", 'small')
-        self.display.draw_text((80, 110), "[Next]", 'small')
-        self.display.draw_text((210, 110), "[>]", 'small')
+        # Button hints - no left action, middle cycles, right refreshes
+        self.display.draw_text((88, 110), "[Menu>]", 'small')
+        self.display.draw_text((190, 110), "[Refresh]", 'small')
         
         self.display.display(use_partial=use_partial)
     
     def on_return(self):
-        """Go back"""
+        """No action on left button for Stats menu"""
         pass
     
     def on_go(self):
-        """Cycle through stat pages"""
-        self.page = (self.page + 1) % 2
+        """Refresh stats display"""
         self.render()
 
 
@@ -558,19 +554,20 @@ class SettingsMenu(Menu):
         y += 10
         self.display.draw_text((10, y), f"Device: {Config.DEVICE_NAME}", 'small')
         
-        # Button hints
-        self.display.draw_text((5, 110), "[Back]", 'small')
-        self.display.draw_text((80, 110), "[Chg]", 'small')
-        self.display.draw_text((210, 110), "[>]", 'small')
+        # Button hints - left=prev item, middle=menu, right=change value
+        self.display.draw_text((3, 110), "[<Prev]", 'small')
+        self.display.draw_text((88, 110), "[Menu>]", 'small')
+        self.display.draw_text((190, 110), "[Change]", 'small')
         
         self.display.display(use_partial=use_partial)
     
     def on_return(self):
-        """Go back"""
-        pass
+        """Move to previous setting item"""
+        self.selected_item = (self.selected_item - 1) % len(self.items)
+        self.render()
     
     def on_go(self):
-        """Change selected setting"""
+        """Change value of selected setting (doesn't move selection)"""
         settings = get_settings()
         
         if self.selected_item == 0:  # Time format
@@ -587,12 +584,11 @@ class SettingsMenu(Menu):
             current_idx = modes.index(current) if current in modes else 1
             settings.set("refresh_mode", modes[(current_idx + 1) % len(modes)])
         
-        self.selected_item = (self.selected_item + 1) % len(self.items)
         self.render()
 
 
 class MenuStateMachine:
-    """Manages menu navigation and state with thread safety and throttling"""
+    """Manages menu navigation and state (simplified - single-threaded)"""
     
     def __init__(self, display: DisplayManager):
         self.display = display
@@ -605,14 +601,13 @@ class MenuStateMachine:
         self.current_menu_index = 0
         self.needs_render = True
         
-        # Thread safety
-        self._lock = threading.Lock()
+        # Rendering state
         self._rendering = False
-        self._in_transition = False  # NEW: Prevents updates during menu changes
+        self._in_transition = False  # Prevents updates during menu changes
         
         # Button press throttling
         self._last_button_press = 0
-        self._min_button_interval = 0.3  # 300ms minimum between button presses
+        self._min_button_interval = 0.15  # 150ms minimum between button presses
         
         # Error recovery
         self._render_failures = 0
@@ -658,20 +653,21 @@ class MenuStateMachine:
             return False
     
     def next_menu(self):
-        """Switch to next menu with thread safety"""
-        with self._lock:
-            if self._rendering or self._in_transition:
-                if Config.DEBUG_MODE:
-                    print("Render/transition in progress, skipping menu switch")
-                return
-            
-            if not self._can_process_button():
-                return
-            
-            self._in_transition = True  # Block all updates during transition
-            self._rendering = True
+        """Switch to next menu (simplified - runs in main thread)"""
+        # Check if already rendering or transitioning
+        if self._rendering or self._in_transition:
+            if Config.DEBUG_MODE:
+                print("Render/transition in progress, skipping menu switch")
+            return
         
-        # Release lock before rendering (which is slow)
+        # Throttle button presses
+        if not self._can_process_button():
+            return
+        
+        # Mark as transitioning
+        self._in_transition = True
+        self._rendering = True
+        
         try:
             old_menu_index = self.current_menu_index
             self.current_menu_index = (self.current_menu_index + 1) % len(self.menus)
@@ -682,53 +678,56 @@ class MenuStateMachine:
                 if hasattr(menu, 'base_image_set'):
                     menu.base_image_set = False
             
-            # Use full render when changing menus to prevent ghosting
+            # Render the menu - ALWAYS use full refresh to prevent ghosting
             if self.needs_render:
                 if self.current_menu_index == 0 and hasattr(self.current_menu, 'render_full'):
                     # Going to main menu - set up for partial updates
                     self._safe_render(self.current_menu.render_full)
                 else:
-                    # Other menus - use full refresh to clear ghosting
+                    # Other menus - ALWAYS use full refresh to clear ghosting
                     if hasattr(self.current_menu, 'render'):
-                        self._safe_render(lambda: self.current_menu.render(use_partial=False))
+                        # Check if render accepts use_partial parameter
+                        import inspect
+                        sig = inspect.signature(self.current_menu.render)
+                        if 'use_partial' in sig.parameters:
+                            # Force full refresh (use_partial=False)
+                            self._safe_render(lambda: self.current_menu.render(use_partial=False))
+                        else:
+                            # Fallback to regular render if parameter not supported
+                            self._safe_render(self.current_menu.render)
                     else:
                         self._safe_render(self.current_menu.render)
                 self.needs_render = False
             
-            # Small delay to ensure display settles (outside lock!)
-            time.sleep(0.1)
-            
         finally:
-            with self._lock:
-                self._rendering = False
-                self._in_transition = False  # Re-enable updates
+            self._rendering = False
+            self._in_transition = False
     
     def handle_return(self):
-        """Handle RETURN button with thread safety"""
-        with self._lock:
-            if self._rendering or self._in_transition:
-                if Config.DEBUG_MODE:
-                    print("Render/transition in progress, ignoring button press")
-                return
-            
-            if not self._can_process_button():
-                return
-            
-            if self.current_menu_index == 0:
-                # On main menu, RETURN feeds pet - no transition needed
-                self._rendering = True
+        """Handle RETURN button (simplified - runs in main thread)"""
+        # Check if already processing
+        if self._rendering or self._in_transition:
+            if Config.DEBUG_MODE:
+                print("Render/transition in progress, ignoring button press")
+            return
         
-        # Release lock before potentially slow operations
-        try:
-            if self.current_menu_index == 0:
-                # On main menu, RETURN feeds pet
+        # Throttle button presses
+        if not self._can_process_button():
+            return
+        
+        if self.current_menu_index == 0:
+            # On main menu, RETURN feeds pet - no transition needed
+            self._rendering = True
+            try:
                 self.current_menu.on_return()
-            else:
-                # On other menus, RETURN goes back to main
-                with self._lock:
-                    self._in_transition = True  # Block updates during transition
-                    self._rendering = True
-                
+            finally:
+                self._rendering = False
+        else:
+            # On other menus, RETURN goes back to main
+            self._in_transition = True
+            self._rendering = True
+            
+            try:
                 self.current_menu_index = 0
                 self.needs_render = True
                 
@@ -738,67 +737,50 @@ class MenuStateMachine:
                         menu.base_image_set = False
                 
                 if self.needs_render:
-                    # Use full render when going back to main menu
+                    # Use full render when going back to main menu (always full for main)
                     if hasattr(self.current_menu, 'render_full'):
                         self._safe_render(self.current_menu.render_full)
                     else:
                         self._safe_render(self.current_menu.render)
                     self.needs_render = False
-                
-                # Small delay to ensure display settles (outside lock!)
-                time.sleep(0.1)
-                
-        finally:
-            with self._lock:
+                    
+            finally:
                 self._rendering = False
-                if self.current_menu_index != 0:
-                    self._in_transition = False  # Re-enable updates if we transitioned
+                self._in_transition = False
     
     def handle_action(self):
         """Handle ACTION button (switch menu) with thread safety"""
         self.next_menu()
     
     def handle_go(self):
-        """Handle GO button with thread safety"""
-        with self._lock:
-            if self._rendering:
-                if Config.DEBUG_MODE:
-                    print("Render in progress, ignoring button press")
-                return
-            
-            if not self._can_process_button():
-                return
-            
+        """Handle GO button (simplified - runs in main thread)"""
+        if self._rendering:
+            if Config.DEBUG_MODE:
+                print("Render in progress, ignoring button press")
+            return
+        
+        if not self._can_process_button():
+            return
+        
+        self._rendering = True
+        try:
+            self.current_menu.on_go()
+        finally:
+            self._rendering = False
+    
+    def render_current(self):
+        """Render current menu if needed (simplified - runs in main thread)"""
+        if self.needs_render and not self._rendering:
             self._rendering = True
             try:
-                self.current_menu.on_go()
+                self._safe_render(self.current_menu.render)
+                self.needs_render = False
             finally:
                 self._rendering = False
     
-    def render_current(self):
-        """Render current menu if needed with thread safety"""
-        # Use try_lock to avoid blocking the main loop
-        acquired = self._lock.acquire(blocking=False)
-        if not acquired:
-            if Config.DEBUG_MODE:
-                print("Render locked, skipping")
-            return
-        
-        try:
-            if self.needs_render and not self._rendering:
-                self._rendering = True
-                try:
-                    self._safe_render(self.current_menu.render)
-                    self.needs_render = False
-                finally:
-                    self._rendering = False
-        finally:
-            self._lock.release()
-    
     def request_render(self):
-        """Mark that a render is needed (thread-safe)"""
-        with self._lock:
-            self.needs_render = True
+        """Mark that a render is needed"""
+        self.needs_render = True
 
 
 if __name__ == "__main__":

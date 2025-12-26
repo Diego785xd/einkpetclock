@@ -46,16 +46,49 @@ class DisplayManager:
         self.shutdown()
         sys.exit(0)
     
+    def process_button_events(self):
+        """Process any pending button events from queue (runs in main thread)"""
+        event = self.buttons.get_event(timeout=0)  # Non-blocking
+        
+        if event is None:
+            return  # No event pending
+        
+        # Process the event in main thread (no threading issues!)
+        try:
+            self.stats.increment("total_button_presses")
+            
+            if event == "return_press":
+                if Config.DEBUG_MODE:
+                    print("Processing RETURN button event")
+                self.menu_system.handle_return()
+                self.menu_system.request_render()
+                
+            elif event == "action_press":
+                if Config.DEBUG_MODE:
+                    print("Processing ACTION button event")
+                self.menu_system.handle_action()
+                
+            elif event == "action_hold":
+                if Config.DEBUG_MODE:
+                    print("Processing ACTION hold event")
+                # Long press - could do special action
+                self.menu_system.handle_action()
+                
+            elif event == "go_press":
+                if Config.DEBUG_MODE:
+                    print("Processing GO button event")
+                self.menu_system.handle_go()
+                
+        except Exception as e:
+            print(f"Error processing button event '{event}': {e}")
+            self.stats.record_error(f"Button {event}: {e}")
+    
     def setup(self):
-        """Initialize hardware and register button callbacks"""
+        """Initialize hardware (no callbacks - using event queue)"""
         # Initialize display
         self.display.init()
         
-        # Register button callbacks (using gpiozero API)
-        self.buttons.on_return_press(self._on_return_button)
-        self.buttons.on_action_press(self._on_action_button)
-        self.buttons.on_action_hold(self._on_action_long_press)  # Long press for special actions
-        self.buttons.on_go_press(self._on_go_button)
+        # No callback registration needed - we poll the event queue instead
         
         # Initial render
         self.menu_system.render_current()
@@ -64,47 +97,7 @@ class DisplayManager:
         print("Button mappings:")
         print("  RETURN (GPIO 6):  Feed pet / Back")
         print("  ACTION (GPIO 13): Switch menu")
-        print("  GO (GPIO 19):     Send message / Action")
-    
-    def _on_return_button(self):
-        """Handle RETURN button press"""
-        try:
-            self.stats.increment("total_button_presses")
-            self.menu_system.handle_return()
-            self.menu_system.request_render()
-        except Exception as e:
-            print(f"Error handling RETURN button: {e}")
-            self.stats.record_error(f"RETURN button: {e}")
-    
-    def _on_action_button(self):
-        """Handle ACTION button press"""
-        try:
-            self.stats.increment("total_button_presses")
-            self.menu_system.handle_action()
-        except Exception as e:
-            print(f"Error handling ACTION button: {e}")
-            self.stats.record_error(f"ACTION button: {e}")
-    
-    def _on_action_long_press(self):
-        """Handle ACTION button long press (hold)"""
-        try:
-            if Config.DEBUG_MODE:
-                print("ACTION long press detected")
-            # Could show settings menu or trigger special action
-            # For now, just do the same as regular press
-            self.menu_system.handle_action()
-        except Exception as e:
-            print(f"Error handling ACTION long press: {e}")
-            self.stats.record_error(f"ACTION hold: {e}")
-    
-    def _on_go_button(self):
-        """Handle GO button press"""
-        try:
-            self.stats.increment("total_button_presses")
-            self.menu_system.handle_go()
-        except Exception as e:
-            print(f"Error handling GO button: {e}")
-            self.stats.record_error(f"GO button: {e}")
+        print("Using event queue for button handling (non-blocking)")
     
     def check_flags(self):
         """Check for flags from API service"""
@@ -239,6 +232,9 @@ class DisplayManager:
         
         try:
             while self.running:
+                # Process button events (from event queue)
+                self.process_button_events()
+                
                 # Check flags from API
                 now = datetime.now()
                 if (now - self.last_flag_check).seconds >= 5:  # Check every 5 seconds
@@ -260,8 +256,8 @@ class DisplayManager:
                 # Render if needed (for menu changes, etc.)
                 self.menu_system.render_current()
                 
-                # Sleep to reduce CPU usage
-                time.sleep(0.1)
+                # Sleep to reduce CPU usage (but keep responsive to buttons)
+                time.sleep(0.05)  # 50ms = 20 polls per second
         
         except KeyboardInterrupt:
             print("\nKeyboard interrupt received")

@@ -200,6 +200,7 @@ class MessageLog:
     def add_message(self, from_device: str, message: str, msg_type: str = "text"):
         """Add a new message to the log"""
         entry = {
+            "id": int(datetime.now(timezone.utc).timestamp() * 1000),  # Unique ID based on timestamp
             "from": from_device,
             "message": message,
             "type": msg_type,
@@ -256,6 +257,50 @@ class MessageLog:
     def get_unread_count(self) -> int:
         """Get count of unread messages"""
         return len(self.get_messages(unread_only=True))
+    
+    def delete_message(self, msg_id: int):
+        """Delete a message by ID"""
+        if not self.file_path.exists():
+            return
+        
+        messages = []
+        with open(self.file_path, 'r') as f:
+            for line in f:
+                try:
+                    msg = json.loads(line.strip())
+                    # Keep messages that don't match the ID
+                    if msg.get("id") != msg_id:
+                        messages.append(msg)
+                except json.JSONDecodeError:
+                    continue
+        
+        # Rewrite file without the deleted message
+        with open(self.file_path, 'w') as f:
+            for msg in messages:
+                f.write(json.dumps(msg) + '\n')
+    
+    def delete_most_recent(self):
+        """Delete the most recent message"""
+        if not self.file_path.exists():
+            return
+        
+        messages = []
+        with open(self.file_path, 'r') as f:
+            for line in f:
+                try:
+                    msg = json.loads(line.strip())
+                    messages.append(msg)
+                except json.JSONDecodeError:
+                    continue
+        
+        if messages:
+            # Remove the last message (most recent)
+            messages.pop()
+            
+            # Rewrite file
+            with open(self.file_path, 'w') as f:
+                for msg in messages:
+                    f.write(json.dumps(msg) + '\n')
     
     def _trim_if_needed(self):
         """Keep only the most recent N messages"""
